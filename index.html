@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payment Data Simulator</title>
+    <title>Payment Data & Benchmark Simulator</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
         .container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
@@ -11,160 +11,459 @@
         .method-section { background: #f8f9fa; border-radius: 15px; padding: 20px; margin: 20px 0; border-left: 5px solid #2980b9; }
         .method-title { color: #2980b9; font-size: 1.4em; font-weight: bold; margin-bottom: 15px; }
         .control-group { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
-        .control-group label { min-width: 120px; font-weight: bold; color: #2c3e50; }
-        .control-group input { padding: 8px; border: 2px solid #bdc3c7; border-radius: 5px; font-size: 1em; width: 100px; }
-        .btn-generate { background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 1.1em; font-weight: bold; cursor: pointer; display: block; margin: 20px auto; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3); }
-        .btn-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4); }
-        .histogram-controls { background: #e8f8f5; border-radius: 10px; padding: 20px; margin: 20px 0; border: 2px solid #27ae60; }
+        .control-group label { min-width: 220px; font-weight: bold; color: #2c3e50; } /* Increased min-width */
+        .control-group input[type="number"], .control-group select { padding: 8px; border: 2px solid #bdc3c7; border-radius: 5px; font-size: 1em; width: 100px; }
+        .control-group input[type="checkbox"] { margin-right: 5px; vertical-align: middle;}
+        .control-group label.checkbox-label { min-width: auto; font-weight: normal;} /* Specific for checkbox label */
+
+        .btn-action { background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 1.1em; font-weight: bold; cursor: pointer; display: block; margin: 20px auto; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3); }
+        .btn-action:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4); }
+        .btn-benchmark { background: linear-gradient(45deg, #2ecc71, #27ae60); } /* Different color for benchmark button */
+        .btn-benchmark:hover { box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4); }
+
+        .histogram-controls { background: #e8f8f5; border-radius: 10px; padding: 20px; margin: 20px 0; border: 2px solid #16a085; } /* Adjusted border color */
         #histogramCanvas { border: 2px solid #34495e; border-radius: 10px; background: white; margin: 20px auto; display: block; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .stats-display { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; background: #fff; padding: 15px; border-radius: 10px; margin: 15px 0; border: 2px solid #e74c3c; }
-        .stats-item { text-align: center; padding: 8px; background: #fdfdfd; border-radius: 5px; border: 1px solid #ecf0f1; }
-        .stats-label { font-size: 0.8em; color: #7f8c8d; font-weight: bold; }
-        .stats-value { font-size: 1.1em; color: #2c3e50; font-weight: bold; }
+        .stats-display, .benchmark-results { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; background: #fff; padding: 15px; border-radius: 10px; margin: 15px 0; }
+        .stats-display { border: 2px solid #e74c3c; }
+        .benchmark-results { border: 2px solid #f39c12; } /* Different border for benchmark results */
+        .stats-item, .result-item { text-align: center; padding: 8px; background: #fdfdfd; border-radius: 5px; border: 1px solid #ecf0f1; }
+        .stats-label, .result-label { font-size: 0.8em; color: #7f8c8d; font-weight: bold; }
+        .stats-value, .result-value { font-size: 1.1em; color: #2c3e50; font-weight: bold; }
+        .result-rationale { grid-column: 1 / -1; text-align: left; font-size: 0.9em; background-color: #fef9e7; padding: 10px; border-left: 3px solid #f39c12;}
+
+
         .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; font-family: monospace; font-size: 0.9em; }
         .data-cell { background: #ecf0f1; padding: 5px; text-align: center; border-radius: 4px; border: 1px solid #bdc3c7; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🧮 Payment Data Simulator</h1>
+        <h1>🧮 Payment Data & Benchmark Simulator</h1>
 
         <!-- Simulation Parameters -->
         <div class="method-section">
-            <div class="method-title">⚙️ Simulation Parameters</div>
-            <div class="control-group"><label>Sample Size (N):</label><input type="number" id="sampleSize" value="428" min="1"></div>
+            <div class="method-title">⚙️ Input Summary Statistics (Target for Data Simulation)</div>
+            <div class="control-group"><label>Sample Size (N for Sim):</label><input type="number" id="sampleSize" value="428" min="1"></div>
             <div class="control-group"><label>Min Value:</label><input type="number" id="valMin" value="357" step="1"></div>
             <div class="control-group"><label>25th Percentile:</label><input type="number" id="valP25" value="613" step="1"></div>
             <div class="control-group"><label>Median:</label><input type="number" id="valMedian" value="1082" step="1"></div>
-            <div class="control-group"><label>75th Percentile:</label><input type="number" id="valP75" value="1632" step="1"></div>
+            <div class="control-group"><label>75th Percentile (P75 for Logic):</label><input type="number" id="valP75" value="1632" step="1"></div>
             <div class="control-group"><label>90th Percentile:</label><input type="number" id="valP90" value="2600" step="1"></div>
             <div class="control-group"><label>Max Value:</label><input type="number" id="valMax" value="6223" step="1"></div>
         </div>
 
-        <button class="btn-generate" onclick="generateSampleData()">Generate Sample Data & Histogram</button>
+        <button class="btn-action" onclick="generateSampleData()">Simulate Data & Update Chart</button>
 
         <!-- Histogram Controls -->
         <div class="histogram-controls">
-            <div class="control-group"><label>Bin Width ($):</label><input type="number" id="binWidth" value="200" min="1"></div>
-            <div class="control-group"><label>Chart Type:</label><select id="chartType"><option value="histogram">Histogram</option><option value="density">Density Curve</option><option value="both">Both</option></select></div>
-            <div class="control-group"><label>Show Statistics:</label><input type="checkbox" id="showStats" checked></div>
+            <div class="method-title">📊 Chart Controls</div>
+            <div class="control-group"><label>Bin Width ($):</label><input type="number" id="binWidth" value="200" min="1" onchange="updateHistogram()"></div>
+            <div class="control-group"><label>Chart Type:</label><select id="chartType" onchange="updateHistogram()"><option value="histogram">Histogram</option><option value="density">Density Curve</option><option value="both">Both</option></select></div>
+            <div class="control-group"><label>Show Sim Stats:</label><input type="checkbox" id="showSimStats" checked onchange="toggleStatsDisplay()"></div>
         </div>
 
-        <canvas id="histogramCanvas" width="800" height="400" style="display:none;"></canvas>
+        <canvas id="histogramCanvas" width="800" height="450" style="display:none;"></canvas>
 
         <div id="generatedStats" class="stats-display" style="display:none;">
-            <div class="stats-item"><div class="stats-label">Mean</div><div id="genMean" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">Median</div><div id="genMedian" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">Std Dev</div><div id="genStdDev" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">Skewness</div><div id="genSkew" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">Min</div><div id="genMin" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">Max</div><div id="genMax" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">25th P</div><div id="genP25" class="stats-value">-</div></div>
-            <div class="stats-item"><div class="stats-label">75th P</div><div id="genP75" class="stats-value">-</div></div>
+            <!-- Stats items will be populated by JS -->
         </div>
-
-        <div id="sampleData" class="sample-data" style="display:none;">
+        
+        <div id="sampleDataDisplay" class="sample-data" style="display:none;">
             <h3>Sample Generated Data (first 50):</h3>
             <div id="dataGrid" class="data-grid"></div>
         </div>
+
+        <!-- Benchmark Logic Section -->
+        <div class="method-section">
+            <div class="method-title">⚖️ Benchmark Alignment Logic (Phase 3.3)</div>
+            <p style="font-size:0.9em; color: #555;">This applies rules to the <strong>Input 75th Percentile (P75 for Logic)</strong> from above against the Current Benchmark you set below, considering budget increments of $5,000, $10,000, $15,000. The simulated data is for visualization only.</p>
+            <div class="control-group">
+                <label for="currentBenchmarkInput">Current Benchmark (CB): $</label>
+                <input type="number" id="currentBenchmarkInput" value="1500">
+            </div>
+            <div class="control-group">
+                <label for="raiseProximityDeltaInput">Raise Proximity Delta (for budget step): $</label>
+                <input type="number" id="raiseProximityDeltaInput" value="200" step="50">
+            </div>
+            <div class="control-group">
+                <label for="lowerProximityDeltaInput">Lower Proximity Delta (for budget floor): $</label>
+                <input type="number" id="lowerProximityDeltaInput" value="250" step="50">
+            </div>
+            <div class="control-group">
+                <input type="checkbox" id="isCloseToButLessThanPriorityInput">
+                <label for="isCloseToButLessThanPriorityInput" class="checkbox-label">Item was on 'Close to but Less Than' Priority List (for Hold logic)?</label>
+            </div>
+            <button class="btn-action btn-benchmark" onclick="applyBenchmarkLogicAndRedraw()">Apply Benchmark Logic & Update Chart</button>
+        </div>
+
+        <div id="benchmarkResultsDisplay" class="benchmark-results" style="display:none;">
+            <div class="result-item"><div class="result-label">Data Direction Signal</div><div id="dataDirectionSignalOutput" class="result-value">-</div></div>
+            <div class="result-item"><div class="result-label">Input P75 (Used for Logic)</div><div id="p75ForLogicOutput" class="result-value">-</div></div>
+            <div class="result-item"><div class="result-label">Final Decision</div><div id="finalDecisionOutput" class="result-value">-</div></div>
+            <div class="result-item"><div class="result-label">Final Proposed BM</div><div id="finalProposedBMOutput" class="result-value">-</div></div>
+            <div class="result-item result-rationale"><div class="result-label">Rationale:</div><div id="rationaleOutput" class="result-value" style="text-align:left; font-size:0.9em;">-</div></div>
+        </div>
+
     </div>
 
     <script>
         let generatedData = [];
+        let currentSimStats = {}; // To store stats from generated data
+        let finalProposedBMValue = null; // To store the result of benchmark logic
 
+        // --- Data Simulation and Basic Stats ---
         function generateSampleData() {
             const n = parseInt(document.getElementById('sampleSize').value);
             const min = parseFloat(document.getElementById('valMin').value);
-            const p25 = parseFloat(document.getElementById('valP25').value);
-            const med = parseFloat(document.getElementById('valMedian').value);
-            const p75 = parseFloat(document.getElementById('valP75').value);
-            const p90 = parseFloat(document.getElementById('valP90').value);
+            const p25Target = parseFloat(document.getElementById('valP25').value);
+            const medTarget = parseFloat(document.getElementById('valMedian').value);
+            const p75Target = parseFloat(document.getElementById('valP75').value); // This is the INPUT P75 for logic, also target for sim
+            const p90Target = parseFloat(document.getElementById('valP90').value);
             const max = parseFloat(document.getElementById('valMax').value);
+            
+            if (isNaN(n) || isNaN(min) || isNaN(p25Target) || isNaN(medTarget) || isNaN(p75Target) || isNaN(p90Target) || isNaN(max)) {
+                alert("Please ensure all simulation parameter inputs are valid numbers.");
+                return;
+            }
+            if (!(min <= p25Target && p25Target <= medTarget && medTarget <= p75Target && p75Target <= p90Target && p90Target <= max)) {
+                alert("Percentile values are not in ascending order or min/max is inconsistent. Please correct inputs.");
+                return;
+            }
+
             generatedData = [];
             for (let i = 0; i < n; i++) {
                 const r = Math.random();
                 let val;
-                if (r <= 0.25) val = min + (p25 - min) * (r / 0.25);
-                else if (r <= 0.5) val = p25 + (med - p25) * ((r - 0.25) / 0.25);
-                else if (r <= 0.75) val = med + (p75 - med) * ((r - 0.5) / 0.25);
-                else if (r <= 0.9) val = p75 + (p90 - p75) * ((r - 0.75) / 0.15);
-                else val = p90 + (max - p90) * ((r - 0.9) / 0.1);
+                if (r <= 0.25) val = min + (p25Target - min) * (r / 0.25);
+                else if (r <= 0.50) val = p25Target + (medTarget - p25Target) * ((r - 0.25) / 0.25);
+                else if (r <= 0.75) val = medTarget + (p75Target - medTarget) * ((r - 0.50) / 0.25);
+                else if (r <= 0.90) val = p75Target + (p90Target - p75Target) * ((r - 0.75) / 0.15);
+                else val = p90Target + (max - p90Target) * ((r - 0.90) / 0.10);
                 generatedData.push(Math.round(val));
             }
-            updateSampleDataDisplay(); updateHistogram();
+            finalProposedBMValue = null; 
+            document.getElementById('benchmarkResultsDisplay').style.display = 'none'; 
+
+            updateSampleDataDisplay();
+            currentSimStats = calculateStats(generatedData);
+            displayGeneratedStats();
+            updateHistogram(); 
+            
             document.getElementById('histogramCanvas').style.display = 'block';
-            document.getElementById('sampleData').style.display = 'block';
+            document.getElementById('sampleDataDisplay').style.display = 'block';
         }
 
         function updateSampleDataDisplay() {
             const grid = document.getElementById('dataGrid'); grid.innerHTML = '';
-            for (let i = 0; i < Math.min(50, generatedData.length); i++) {
+            const displayCount = Math.min(50, generatedData.length);
+            for (let i = 0; i < displayCount; i++) {
                 const cell = document.createElement('div'); cell.className = 'data-cell';
                 cell.textContent = generatedData[i].toLocaleString(); grid.appendChild(cell);
             }
         }
+        
+        function toggleStatsDisplay() {
+            const show = document.getElementById('showSimStats').checked;
+            document.getElementById('generatedStats').style.display = show && generatedData.length > 0 ? 'grid' : 'none';
+        }
+
+        function displayGeneratedStats() {
+            if (!currentSimStats || Object.keys(currentSimStats).length === 0) return;
+            const statsEl = document.getElementById('generatedStats');
+            statsEl.innerHTML = `
+                <div class="stats-item"><div class="stats-label">Sim N</div><div class="stats-value">${currentSimStats.n.toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim Mean</div><div class="stats-value">${Math.round(currentSimStats.mean).toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim Median</div><div class="stats-value">${Math.round(currentSimStats.median).toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim Std Dev</div><div class="stats-value">${Math.round(currentSimStats.stdDev).toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim Skew</div><div class="stats-value">${currentSimStats.skewness.toFixed(2)}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim Min</div><div class="stats-value">${currentSimStats.min.toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim Max</div><div class="stats-value">${currentSimStats.max.toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim P25</div><div class="stats-value">${Math.round(currentSimStats.p25).toLocaleString()}</div></div>
+                <div class="stats-item"><div class="stats-label">Sim P75</div><div class="stats-value" id="actualGenP75">${Math.round(currentSimStats.p75).toLocaleString()}</div></div>
+            `; 
+            toggleStatsDisplay(); 
+        }
 
         function calculateStats(data) {
-            const sorted = [...data].sort((a,b)=>a-b), n = data.length;
-            const mean = data.reduce((s,v)=>s+v,0)/n;
-            const median = n%2===0 ? (sorted[n/2-1]+sorted[n/2])/2 : sorted[Math.floor(n/2)];
-            const variance = data.reduce((s,v)=>s+Math.pow(v-mean,2),0)/(n-1);
+            if (!data || data.length === 0) return {};
+            const sorted = [...data].sort((a, b) => a - b);
+            const n = data.length;
+            const mean = data.reduce((s, v) => s + v, 0) / n;
+            const median = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[Math.floor(n / 2)];
+            const variance = n > 1 ? data.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (n - 1) : 0;
             const stdDev = Math.sqrt(variance);
-            const skew = data.reduce((s,v)=>s+Math.pow((v-mean)/stdDev,3),0)/n;
-            const min = Math.min(...data), max = Math.max(...data);
-            const p25 = sorted[Math.floor(n*0.25)], p75 = sorted[Math.floor(n*0.75)];
-            return {mean, median, stdDev, skewness: skew, min, max, p25, p75};
+            let m3 = 0;
+            for(let val of data){ m3 += Math.pow(val - mean, 3); }
+            const skew = n > 2 && stdDev > 1e-9 ? (m3/n) / Math.pow(stdDev,3) : 0; 
+            const min = sorted[0], max = sorted[n - 1];
+            const p25 = n > 0 ? sorted[Math.floor(n * 0.25)] : 0;
+            const p75 = n > 0 ? sorted[Math.floor(n * 0.75)] : 0;
+            return { mean, median, stdDev, skewness: skew, min, max, p25, p75, n };
         }
 
+        // --- Histogram Drawing ---
         function updateHistogram() {
-            if (!generatedData.length) return;
-            const canvas = document.getElementById('histogramCanvas'), ctx = canvas.getContext('2d');
+            if (!generatedData.length || Object.keys(currentSimStats).length === 0) return;
+            const canvas = document.getElementById('histogramCanvas');
+            if (!canvas.getContext) return; 
+            const ctx = canvas.getContext('2d');
             const binWidth = parseFloat(document.getElementById('binWidth').value);
             const type = document.getElementById('chartType').value;
-            const show = document.getElementById('showStats').checked;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            let chartDisplayMinVal = currentSimStats.min;
+            let chartDisplayMaxVal = currentSimStats.max;
 
-            ctx.clearRect(0,0,canvas.width,canvas.height);
-            const minVal = Math.min(...generatedData), maxVal = Math.max(...generatedData);
-            const binsCount = Math.ceil((maxVal-minVal)/binWidth), bins = new Array(binsCount).fill(0);
-            generatedData.forEach(v=>{ const i=Math.min(Math.floor((v-minVal)/binWidth),binsCount-1); bins[i]++; });
+            const currentBenchmarkInputVal = parseFloat(document.getElementById('currentBenchmarkInput').value);
+            const budgetTiers = [5000, 10000, 15000];
+            const highestBudgetTier = budgetTiers[budgetTiers.length -1];
 
-            const pad=60, cw=canvas.width-2*pad, ch=canvas.height-2*pad, maxCount=Math.max(...bins);
-            ctx.strokeStyle='#2c3e50'; ctx.lineWidth=2;
-            ctx.beginPath(); ctx.moveTo(pad,pad); ctx.lineTo(pad,canvas.height-pad); ctx.lineTo(canvas.width-pad,canvas.height-pad); ctx.stroke();
-
-            if (type!=='density') {
-                ctx.fillStyle='rgba(52,152,219,0.7)'; ctx.strokeStyle='#2980b9'; ctx.lineWidth=1;
-                bins.forEach((c,i)=>{ const h=(c/maxCount)*ch, w=cw/binsCount, x=pad+i*w, y=canvas.height-pad-h; ctx.fillRect(x,y,w-1,h); ctx.strokeRect(x,y,w-1,h); });
+            if (!isNaN(currentBenchmarkInputVal)) {
+                chartDisplayMaxVal = Math.max(chartDisplayMaxVal, currentBenchmarkInputVal);
+                chartDisplayMinVal = Math.min(chartDisplayMinVal, currentBenchmarkInputVal); 
             }
-            if (type!=='histogram') {
-                ctx.strokeStyle='#e74c3c'; ctx.lineWidth=3; ctx.beginPath();
-                bins.forEach((c,i)=>{ const dens=c/generatedData.length/binWidth, nh=(dens/(maxCount/generatedData.length/binWidth))*ch;
-                    const x=pad+(i+0.5)*(cw/binsCount), y=canvas.height-pad-nh;
-                    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-                }); ctx.stroke();
+            chartDisplayMaxVal = Math.max(chartDisplayMaxVal, highestBudgetTier);
+            if (finalProposedBMValue !== null && !isNaN(finalProposedBMValue)) {
+                chartDisplayMaxVal = Math.max(chartDisplayMaxVal, finalProposedBMValue);
+                chartDisplayMinVal = Math.min(chartDisplayMinVal, finalProposedBMValue); 
+            }
+            
+            if (chartDisplayMinVal > chartDisplayMaxVal) chartDisplayMinVal = chartDisplayMaxVal - (isNaN(binWidth) || binWidth <=0 ? 100 : binWidth); 
+            if (chartDisplayMinVal === chartDisplayMaxVal) chartDisplayMaxVal = chartDisplayMinVal + (isNaN(binWidth) || binWidth <=0 ? 500 : (5 * binWidth)); 
+
+
+            if (chartDisplayMinVal === undefined || chartDisplayMaxVal === undefined || isNaN(binWidth) || binWidth <=0) {
+                console.error("Histogram drawing prerequisites not met", chartDisplayMinVal, chartDisplayMaxVal, binWidth);
+                return;
             }
 
-            ctx.fillStyle='#2c3e50'; ctx.font='12px Arial'; ctx.textAlign='center';
-            for (let i=0;i<=5;i++){ const v=minVal+(i/5)*(maxVal-minVal), x=pad+(i/5)*cw; ctx.fillText(Math.round(v).toLocaleString(),x,canvas.height-pad+20); }
-            ctx.textAlign='right'; for (let i=0;i<=5;i++){ const v=Math.round((i/5)*maxCount), y=canvas.height-pad-(i/5)*ch+5; ctx.fillText(v.toString(),pad-10,y); }
-            ctx.textAlign='center'; ctx.font='14px Arial'; ctx.fillText('Payment Amount',canvas.width/2,canvas.height-10);
-            ctx.save(); ctx.translate(20,canvas.height/2); ctx.rotate(-Math.PI/2); ctx.fillText('Frequency',0,0); ctx.restore();
-            ctx.font='bold 16px Arial'; ctx.fillText(`Payment Distribution (Bin Width: ${binWidth})`,canvas.width/2,25);
+            const dataMinValForBins = currentSimStats.min;
+            const dataMaxValForBins = currentSimStats.max;
+            const binsCount = Math.max(1, Math.ceil((dataMaxValForBins - dataMinValForBins) / binWidth));
+            const bins = new Array(binsCount).fill(0);
+            generatedData.forEach(v => {
+                let binIndex = Math.floor((v - dataMinValForBins) / binWidth);
+                binIndex = Math.max(0, Math.min(binIndex, binsCount - 1)); 
+                bins[binIndex]++;
+            });
 
-            if (show) {
-                const s=calculateStats(generatedData);
-                document.getElementById('genMean').textContent=Math.round(s.mean).toLocaleString();
-                document.getElementById('genMedian').textContent=Math.round(s.median).toLocaleString();
-                document.getElementById('genStdDev').textContent=Math.round(s.stdDev).toLocaleString();
-                document.getElementById('genSkew').textContent=s.skewness.toFixed(2);
-                document.getElementById('genMin').textContent=s.min.toLocaleString();
-                document.getElementById('genMax').textContent=s.max.toLocaleString();
-                document.getElementById('genP25').textContent=Math.round(s.p25).toLocaleString();
-                document.getElementById('genP75').textContent=Math.round(s.p75).toLocaleString();
-                document.getElementById('generatedStats').style.display='grid';
-            } else document.getElementById('generatedStats').style.display='none';
+            const pad = 60, chartWidth = canvas.width - 2 * pad, chartHeight = canvas.height - 2 * pad;
+            const maxFreq = Math.max(...bins, 1); 
+
+            ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(pad, pad); ctx.lineTo(pad, canvas.height - pad); ctx.lineTo(canvas.width - pad, canvas.height - pad); ctx.stroke();
+            
+            function getXCoord(value) {
+                if (chartDisplayMaxVal === chartDisplayMinVal) return pad + chartWidth / 2; 
+                let x = pad + ((value - chartDisplayMinVal) / (chartDisplayMaxVal - chartDisplayMinVal)) * chartWidth;
+                return x; 
+            }
+
+            if (type === 'histogram' || type === 'both') {
+                ctx.fillStyle = 'rgba(52,152,219,0.7)'; ctx.strokeStyle = '#2980b9';
+                const effectiveBarWidth = (chartWidth * binWidth) / (chartDisplayMaxVal - chartDisplayMinVal);
+
+                bins.forEach((count, i) => {
+                    const barHeight = (count / maxFreq) * chartHeight;
+                    const binActualStartValue = dataMinValForBins + i * binWidth;
+                    const x = getXCoord(binActualStartValue);
+                    const y = canvas.height - pad - barHeight;
+                    
+                    if (x < canvas.width - pad && x + effectiveBarWidth > pad && effectiveBarWidth > 0) {
+                        const drawX = Math.max(pad, x);
+                        let drawWidth = effectiveBarWidth -1;
+                        if (drawX + drawWidth > canvas.width - pad) { // Ensure bar doesn't overflow right plot edge
+                            drawWidth = (canvas.width - pad) - drawX;
+                        }
+                         if (drawX < pad ) { // Ensure bar doesn't overflow left plot edge
+                            drawWidth = (drawX + effectiveBarWidth -1) - pad;
+                            // drawX = pad; // This would shift it, better to clip width.
+                        }
+                        if (drawWidth > 0) {
+                            ctx.fillRect(drawX, y, drawWidth, barHeight);
+                            ctx.strokeRect(drawX, y, drawWidth, barHeight);
+                        }
+                    }
+                });
+            }
+
+            if (type === 'density' || type === 'both') {
+                ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2; ctx.beginPath();
+                bins.forEach((count, i) => {
+                    const densityHeight = (count / maxFreq) * chartHeight; 
+                    const binActualMidValue = dataMinValForBins + (i + 0.5) * binWidth;
+                    const x = getXCoord(binActualMidValue);
+                    const y = canvas.height - pad - densityHeight;
+                    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                });
+                ctx.stroke();
+            }
+            
+            if (!isNaN(currentBenchmarkInputVal)) {
+                const cbX = getXCoord(currentBenchmarkInputVal);
+                // Only draw if within the plotting area to avoid text clutter if way off screen
+                if (cbX >= pad - 5 && cbX <= canvas.width - pad + 5) { 
+                    ctx.beginPath(); ctx.strokeStyle = 'green'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]);
+                    ctx.moveTo(cbX, pad); ctx.lineTo(cbX, canvas.height - pad); ctx.stroke();
+                    ctx.fillStyle = 'green'; ctx.textAlign = 'center'; 
+                    ctx.fillText(`CB: ${currentBenchmarkInputVal.toLocaleString()}`, cbX, pad - 5);
+                    ctx.setLineDash([]);
+                }
+            }
+            
+            ctx.lineWidth = 1; ctx.setLineDash([2, 2]);
+            budgetTiers.forEach(tier => {
+                const tierX = getXCoord(tier);
+                if (tierX >= pad && tierX <= canvas.width - pad) {
+                    ctx.beginPath(); ctx.strokeStyle = 'orange';
+                    ctx.moveTo(tierX, pad); ctx.lineTo(tierX, canvas.height - pad - 10); 
+                    ctx.stroke();
+                    ctx.fillStyle = 'orange'; ctx.textAlign = 'center'; ctx.fillText(`$${tier/1000}k`, tierX, pad + 15);
+                }
+            });
+            ctx.setLineDash([]);
+
+            if (finalProposedBMValue !== null && !isNaN(finalProposedBMValue)) {
+                const finalBMX = getXCoord(finalProposedBMValue);
+                // Only draw if within the plotting area
+                if (finalBMX >= pad - 5 && finalBMX <= canvas.width - pad + 5) {
+                    ctx.beginPath(); 
+                    ctx.fillStyle = 'black'; 
+                    ctx.arc(finalBMX, canvas.height - pad - 7, 7, 0, Math.PI * 2); 
+                    ctx.fill();
+                    ctx.fillStyle = 'black'; 
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`New BM: ${Math.round(finalProposedBMValue).toLocaleString()}`, finalBMX, canvas.height - pad - 20);
+                }
+            }
+
+            ctx.fillStyle = '#2c3e50'; ctx.font = '12px Arial'; ctx.textAlign = 'center';
+            const numXLabels = 5;
+            for (let i = 0; i <= numXLabels; i++) {
+                const val = chartDisplayMinVal + (i / numXLabels) * (chartDisplayMaxVal - chartDisplayMinVal); 
+                const x = pad + (i / numXLabels) * chartWidth;
+                ctx.fillText(Math.round(val).toLocaleString(), x, canvas.height - pad + 20);
+            }
+
+            ctx.textAlign = 'right';
+            const numYLabels = 5;
+            for (let i = 0; i <= numYLabels; i++) {
+                const val = Math.round((i / numYLabels) * maxFreq);
+                const y = canvas.height - pad - (i / numYLabels) * chartHeight + 5; 
+                ctx.fillText(val.toString(), pad - 10, y);
+            }
+            
+            ctx.textAlign = 'center'; ctx.font = '14px Arial';
+            ctx.fillText('Payment Amount ($)', canvas.width / 2, canvas.height - 10);
+            ctx.save(); ctx.translate(25, canvas.height / 2); ctx.rotate(-Math.PI / 2);
+            ctx.fillText('Frequency / Density', 0, 0); ctx.restore();
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(`Payment Distribution (Bin Width: $${binWidth.toLocaleString()})`, canvas.width / 2, 25);
         }
+
+        // --- BENCHMARK ALIGNMENT LOGIC (Phase 3.3 from your methodology) ---
+        function applyBenchmarkLogicAndRedraw() {
+            const currentBenchmark = parseFloat(document.getElementById('currentBenchmarkInput').value);
+            const proposedBMDataFromInputP75 = parseFloat(document.getElementById('valP75').value); // *** USES INPUT P75 ***
+
+            const raiseProximityDelta = parseFloat(document.getElementById('raiseProximityDeltaInput').value);
+            const lowerProximityDelta = parseFloat(document.getElementById('lowerProximityDeltaInput').value);
+            const isCloseToButLessThanPriority = document.getElementById('isCloseToButLessThanPriorityInput').checked;
+
+            if (isNaN(proposedBMDataFromInputP75)) {
+                alert("Please ensure the '75th Percentile (P75 for Logic)' input has a valid number.");
+                return;
+            }
+            if (isNaN(currentBenchmark)) {
+                alert("Please ensure the 'Current Benchmark (CB)' input has a valid number.");
+                return;
+            }
+             if (isNaN(raiseProximityDelta) || isNaN(lowerProximityDelta) ) {
+                alert("Please ensure proximity deltas are valid numbers.");
+                return;
+            }
+
+            let dataDirectionSignal = "Hold"; 
+            const lowerThresholdCB = currentBenchmark * 0.95;
+            const upperThresholdCB = currentBenchmark * 1.05;
+
+            if (proposedBMDataFromInputP75 > upperThresholdCB) {
+                dataDirectionSignal = "Raise";
+            } else if (proposedBMDataFromInputP75 < lowerThresholdCB) {
+                dataDirectionSignal = "Lower";
+            }
+            
+            document.getElementById('dataDirectionSignalOutput').textContent = dataDirectionSignal;
+            document.getElementById('p75ForLogicOutput').textContent = proposedBMDataFromInputP75.toLocaleString();
+
+
+            let finalDecision = dataDirectionSignal;
+            let finalProposedBM = proposedBMDataFromInputP75; 
+            let rationale = "";
+            const budgetTiers = [5000, 10000, 15000]; 
+
+            if (dataDirectionSignal === "Raise") {
+                let nextTBA = -1;
+                for (const tier of budgetTiers) {
+                    if (tier > finalProposedBM) { 
+                        nextTBA = tier;
+                        break;
+                    }
+                }
+                if (nextTBA === -1 && finalProposedBM > budgetTiers[budgetTiers.length -1]) { 
+                    rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()}) suggests raising. The Input P75 is above the highest defined budget tier. The proposed benchmark remains this Input P75 value ($${Math.round(finalProposedBM).toLocaleString()}).`;
+                } else if (nextTBA !== -1 && finalProposedBM < nextTBA && (nextTBA - finalProposedBM <= raiseProximityDelta)) {
+                    finalDecision = "Raise to Budget Increment";
+                    finalProposedBM = nextTBA;
+                    rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()}) suggests raising. The Input P75 is within $${raiseProximityDelta.toFixed(0)} of the next budget step ($${nextTBA.toLocaleString()}). Adjusted to $${nextTBA.toLocaleString()} for system alignment.`;
+                } else {
+                    rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()}) suggests raising. The Input P75 ($${Math.round(finalProposedBM).toLocaleString()}) is not close enough (within $${raiseProximityDelta.toFixed(0)}) to the next budget step` + (nextTBA !== -1 ? ` ($${nextTBA.toLocaleString()})` : '') + ` to warrant alignment. The proposed benchmark remains the Input P75 value.`;
+                }
+            }
+            else if (dataDirectionSignal === "Lower") {
+                let relevantLowerTBAFloor = -1;
+                for (let i = budgetTiers.length - 1; i >= 0; i--) {
+                    if (budgetTiers[i] < currentBenchmark) {
+                        relevantLowerTBAFloor = budgetTiers[i];
+                        break;
+                    }
+                }
+
+                if (relevantLowerTBAFloor !== -1 && currentBenchmark > relevantLowerTBAFloor && finalProposedBM < relevantLowerTBAFloor) {
+                    const gap = relevantLowerTBAFloor - finalProposedBM;
+                    if (gap >= 0 && gap <= lowerProximityDelta) { 
+                        finalDecision = "Lower to Budget Increment Floor";
+                        finalProposedBM = relevantLowerTBAFloor;
+                        rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()}) suggests lowering. Current BM ($${currentBenchmark.toLocaleString()}) was above a budget floor ($${relevantLowerTBAFloor.toLocaleString()}). The Input P75 is only $${Math.round(gap).toLocaleString()} below this floor (within $${lowerProximityDelta.toFixed(0)} tolerance). Adjusted to $${relevantLowerTBAFloor.toLocaleString()}.`;
+                    } else {
+                        rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()}) suggests lowering. The Input P75 ($${Math.round(finalProposedBM).toLocaleString()}) is the proposed benchmark. The gap ($${Math.round(gap).toLocaleString()}) to the budget floor ($${relevantLowerTBAFloor.toLocaleString()}) is too large (>$${lowerProximityDelta.toFixed(0)}) to justify holding at the floor.`;
+                    }
+                } else {
+                    rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()}) suggests lowering. The Input P75 ($${Math.round(finalProposedBM).toLocaleString()}) is the proposed benchmark. Conditions for specific budget floor alignment were not met.`;
+                }
+            }
+            else if (dataDirectionSignal === "Hold") {
+                finalDecision = "Hold";
+                finalProposedBM = currentBenchmark; 
+                
+                if (isCloseToButLessThanPriority) {
+                    rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()} is close to Current BM $${currentBenchmark.toLocaleString()}) suggests holding. Item was on 'Close to but Less Than' priority list. Benchmark remains $${currentBenchmark.toLocaleString()}. No automatic push unless Input P75 itself suggested a raise.`;
+                } else {
+                    rationale = `Data (Input P75: $${proposedBMDataFromInputP75.toLocaleString()} is close to Current BM $${currentBenchmark.toLocaleString()}) suggests holding. Benchmark remains $${currentBenchmark.toLocaleString()}. Item not on specific budget alignment priority list for 'Hold' cases.`;
+                }
+            }
+
+            finalProposedBMValue = finalProposedBM; 
+
+            document.getElementById('finalDecisionOutput').textContent = finalDecision;
+            document.getElementById('finalProposedBMOutput').textContent = Math.round(finalProposedBMValue).toLocaleString();
+            document.getElementById('rationaleOutput').textContent = rationale;
+            document.getElementById('benchmarkResultsDisplay').style.display = 'grid';
+
+            updateHistogram(); 
+        }
+        
     </script>
 </body>
 </html>
-
