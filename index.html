@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Data Simulator</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border-radius: 20px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 30px; font-size: 2.5em; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        .method-section { background: #f8f9fa; border-radius: 15px; padding: 20px; margin: 20px 0; border-left: 5px solid #2980b9; }
+        .method-title { color: #2980b9; font-size: 1.4em; font-weight: bold; margin-bottom: 15px; }
+        .control-group { display: flex; align-items: center; gap: 10px; margin: 10px 0; flex-wrap: wrap; }
+        .control-group label { min-width: 120px; font-weight: bold; color: #2c3e50; }
+        .control-group input { padding: 8px; border: 2px solid #bdc3c7; border-radius: 5px; font-size: 1em; width: 100px; }
+        .btn-generate { background: linear-gradient(45deg, #3498db, #2980b9); color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 1.1em; font-weight: bold; cursor: pointer; display: block; margin: 20px auto; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3); }
+        .btn-generate:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(52, 152, 219, 0.4); }
+        .histogram-controls { background: #e8f8f5; border-radius: 10px; padding: 20px; margin: 20px 0; border: 2px solid #27ae60; }
+        #histogramCanvas { border: 2px solid #34495e; border-radius: 10px; background: white; margin: 20px auto; display: block; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .stats-display { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; background: #fff; padding: 15px; border-radius: 10px; margin: 15px 0; border: 2px solid #e74c3c; }
+        .stats-item { text-align: center; padding: 8px; background: #fdfdfd; border-radius: 5px; border: 1px solid #ecf0f1; }
+        .stats-label { font-size: 0.8em; color: #7f8c8d; font-weight: bold; }
+        .stats-value { font-size: 1.1em; color: #2c3e50; font-weight: bold; }
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; font-family: monospace; font-size: 0.9em; }
+        .data-cell { background: #ecf0f1; padding: 5px; text-align: center; border-radius: 4px; border: 1px solid #bdc3c7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧮 Payment Data Simulator</h1>
+
+        <!-- Simulation Parameters -->
+        <div class="method-section">
+            <div class="method-title">⚙️ Simulation Parameters</div>
+            <div class="control-group"><label>Sample Size (N):</label><input type="number" id="sampleSize" value="428" min="1"></div>
+            <div class="control-group"><label>Min Value:</label><input type="number" id="valMin" value="357" step="1"></div>
+            <div class="control-group"><label>25th Percentile:</label><input type="number" id="valP25" value="613" step="1"></div>
+            <div class="control-group"><label>Median:</label><input type="number" id="valMedian" value="1082" step="1"></div>
+            <div class="control-group"><label>75th Percentile:</label><input type="number" id="valP75" value="1632" step="1"></div>
+            <div class="control-group"><label>90th Percentile:</label><input type="number" id="valP90" value="2600" step="1"></div>
+            <div class="control-group"><label>Max Value:</label><input type="number" id="valMax" value="6223" step="1"></div>
+        </div>
+
+        <button class="btn-generate" onclick="generateSampleData()">Generate Sample Data & Histogram</button>
+
+        <!-- Histogram Controls -->
+        <div class="histogram-controls">
+            <div class="control-group"><label>Bin Width ($):</label><input type="number" id="binWidth" value="200" min="1"></div>
+            <div class="control-group"><label>Chart Type:</label><select id="chartType"><option value="histogram">Histogram</option><option value="density">Density Curve</option><option value="both">Both</option></select></div>
+            <div class="control-group"><label>Show Statistics:</label><input type="checkbox" id="showStats" checked></div>
+        </div>
+
+        <canvas id="histogramCanvas" width="800" height="400" style="display:none;"></canvas>
+
+        <div id="generatedStats" class="stats-display" style="display:none;">
+            <div class="stats-item"><div class="stats-label">Mean</div><div id="genMean" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">Median</div><div id="genMedian" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">Std Dev</div><div id="genStdDev" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">Skewness</div><div id="genSkew" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">Min</div><div id="genMin" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">Max</div><div id="genMax" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">25th P</div><div id="genP25" class="stats-value">-</div></div>
+            <div class="stats-item"><div class="stats-label">75th P</div><div id="genP75" class="stats-value">-</div></div>
+        </div>
+
+        <div id="sampleData" class="sample-data" style="display:none;">
+            <h3>Sample Generated Data (first 50):</h3>
+            <div id="dataGrid" class="data-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        let generatedData = [];
+
+        function generateSampleData() {
+            const n = parseInt(document.getElementById('sampleSize').value);
+            const min = parseFloat(document.getElementById('valMin').value);
+            const p25 = parseFloat(document.getElementById('valP25').value);
+            const med = parseFloat(document.getElementById('valMedian').value);
+            const p75 = parseFloat(document.getElementById('valP75').value);
+            const p90 = parseFloat(document.getElementById('valP90').value);
+            const max = parseFloat(document.getElementById('valMax').value);
+            generatedData = [];
+            for (let i = 0; i < n; i++) {
+                const r = Math.random();
+                let val;
+                if (r <= 0.25) val = min + (p25 - min) * (r / 0.25);
+                else if (r <= 0.5) val = p25 + (med - p25) * ((r - 0.25) / 0.25);
+                else if (r <= 0.75) val = med + (p75 - med) * ((r - 0.5) / 0.25);
+                else if (r <= 0.9) val = p75 + (p90 - p75) * ((r - 0.75) / 0.15);
+                else val = p90 + (max - p90) * ((r - 0.9) / 0.1);
+                generatedData.push(Math.round(val));
+            }
+            updateSampleDataDisplay(); updateHistogram();
+            document.getElementById('histogramCanvas').style.display = 'block';
+            document.getElementById('sampleData').style.display = 'block';
+        }
+
+        function updateSampleDataDisplay() {
+            const grid = document.getElementById('dataGrid'); grid.innerHTML = '';
+            for (let i = 0; i < Math.min(50, generatedData.length); i++) {
+                const cell = document.createElement('div'); cell.className = 'data-cell';
+                cell.textContent = generatedData[i].toLocaleString(); grid.appendChild(cell);
+            }
+        }
+
+        function calculateStats(data) {
+            const sorted = [...data].sort((a,b)=>a-b), n = data.length;
+            const mean = data.reduce((s,v)=>s+v,0)/n;
+            const median = n%2===0 ? (sorted[n/2-1]+sorted[n/2])/2 : sorted[Math.floor(n/2)];
+            const variance = data.reduce((s,v)=>s+Math.pow(v-mean,2),0)/(n-1);
+            const stdDev = Math.sqrt(variance);
+            const skew = data.reduce((s,v)=>s+Math.pow((v-mean)/stdDev,3),0)/n;
+            const min = Math.min(...data), max = Math.max(...data);
+            const p25 = sorted[Math.floor(n*0.25)], p75 = sorted[Math.floor(n*0.75)];
+            return {mean, median, stdDev, skewness: skew, min, max, p25, p75};
+        }
+
+        function updateHistogram() {
+            if (!generatedData.length) return;
+            const canvas = document.getElementById('histogramCanvas'), ctx = canvas.getContext('2d');
+            const binWidth = parseFloat(document.getElementById('binWidth').value);
+            const type = document.getElementById('chartType').value;
+            const show = document.getElementById('showStats').checked;
+
+            ctx.clearRect(0,0,canvas.width,canvas.height);
+            const minVal = Math.min(...generatedData), maxVal = Math.max(...generatedData);
+            const binsCount = Math.ceil((maxVal-minVal)/binWidth), bins = new Array(binsCount).fill(0);
+            generatedData.forEach(v=>{ const i=Math.min(Math.floor((v-minVal)/binWidth),binsCount-1); bins[i]++; });
+
+            const pad=60, cw=canvas.width-2*pad, ch=canvas.height-2*pad, maxCount=Math.max(...bins);
+            ctx.strokeStyle='#2c3e50'; ctx.lineWidth=2;
+            ctx.beginPath(); ctx.moveTo(pad,pad); ctx.lineTo(pad,canvas.height-pad); ctx.lineTo(canvas.width-pad,canvas.height-pad); ctx.stroke();
+
+            if (type!=='density') {
+                ctx.fillStyle='rgba(52,152,219,0.7)'; ctx.strokeStyle='#2980b9'; ctx.lineWidth=1;
+                bins.forEach((c,i)=>{ const h=(c/maxCount)*ch, w=cw/binsCount, x=pad+i*w, y=canvas.height-pad-h; ctx.fillRect(x,y,w-1,h); ctx.strokeRect(x,y,w-1,h); });
+            }
+            if (type!=='histogram') {
+                ctx.strokeStyle='#e74c3c'; ctx.lineWidth=3; ctx.beginPath();
+                bins.forEach((c,i)=>{ const dens=c/generatedData.length/binWidth, nh=(dens/(maxCount/generatedData.length/binWidth))*ch;
+                    const x=pad+(i+0.5)*(cw/binsCount), y=canvas.height-pad-nh;
+                    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+                }); ctx.stroke();
+            }
+
+            ctx.fillStyle='#2c3e50'; ctx.font='12px Arial'; ctx.textAlign='center';
+            for (let i=0;i<=5;i++){ const v=minVal+(i/5)*(maxVal-minVal), x=pad+(i/5)*cw; ctx.fillText(Math.round(v).toLocaleString(),x,canvas.height-pad+20); }
+            ctx.textAlign='right'; for (let i=0;i<=5;i++){ const v=Math.round((i/5)*maxCount), y=canvas.height-pad-(i/5)*ch+5; ctx.fillText(v.toString(),pad-10,y); }
+            ctx.textAlign='center'; ctx.font='14px Arial'; ctx.fillText('Payment Amount',canvas.width/2,canvas.height-10);
+            ctx.save(); ctx.translate(20,canvas.height/2); ctx.rotate(-Math.PI/2); ctx.fillText('Frequency',0,0); ctx.restore();
+            ctx.font='bold 16px Arial'; ctx.fillText(`Payment Distribution (Bin Width: ${binWidth})`,canvas.width/2,25);
+
+            if (show) {
+                const s=calculateStats(generatedData);
+                document.getElementById('genMean').textContent=Math.round(s.mean).toLocaleString();
+                document.getElementById('genMedian').textContent=Math.round(s.median).toLocaleString();
+                document.getElementById('genStdDev').textContent=Math.round(s.stdDev).toLocaleString();
+                document.getElementById('genSkew').textContent=s.skewness.toFixed(2);
+                document.getElementById('genMin').textContent=s.min.toLocaleString();
+                document.getElementById('genMax').textContent=s.max.toLocaleString();
+                document.getElementById('genP25').textContent=Math.round(s.p25).toLocaleString();
+                document.getElementById('genP75').textContent=Math.round(s.p75).toLocaleString();
+                document.getElementById('generatedStats').style.display='grid';
+            } else document.getElementById('generatedStats').style.display='none';
+        }
+    </script>
+</body>
+</html>
+
